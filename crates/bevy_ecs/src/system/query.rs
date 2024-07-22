@@ -9,6 +9,7 @@ use crate::{
     world::unsafe_world_cell::UnsafeWorldCell,
 };
 use std::borrow::Borrow;
+use bevy_ecs_macros::Component;
 
 /// [System parameter] that provides selective access to the [`Component`] data stored in a [`World`].
 ///
@@ -1412,11 +1413,63 @@ impl<'w, 's, D: QueryData, F: QueryFilter> Query<'w, 's, D, F> {
     /// # schedule.run(&mut world);
     /// ```
     ///
+    /// 
+    /// 
+    /// Problematic double mutation:
+    /// ```rust
+    /// 
+    /// 
+    /// 
+    ///
+    /// # use bevy_ecs::prelude::*;
+    /// # use bevy_ecs::system::QueryLens;
+    /// #
+    ///
+    /// let mut world = World::new();
+    /// #[derive(Component)]
+    /// struct A {
+    ///     value: usize
+    /// }
+    /// #[derive(Component)]
+    /// struct B { }
+    /// fn system1(
+    ///     mut my_query: Query<(Entity, &mut A, &B)>
+    /// ) {
+    ///     fn immutable_helper(subquery: &mut Query<(&mut A)>, subquery2: &mut Query<(&mut A)>) {
+    ///         let mut values = vec![];
+    ///         for mut x in subquery.iter_mut() {
+    ///             values.push(x.value);
+    ///             x.value = 93802038;
+    ///         }
+    ///         for mut x in subquery2.iter_mut() {
+    ///             values.push(x.value);
+    ///             x.value = 292929;
+    ///         }
+    ///         assert_eq!(values, vec![0, 93802038]);
+    ///     }
+    ///     let mut lens_a = my_query.transmute_lens_immutable::<(&mut A)>();
+    ///     let mut lens_b = my_query.transmute_lens_immutable::<(&mut A)>();
+    ///     let mut q1 = lens_a.query();
+    ///     let mut q2 = lens_b.query();
+    ///     immutable_helper(&mut q1, &mut q2);
+    /// }
+    ///
+    /// world.spawn_empty()
+    ///     .insert(A {value: 0})
+    ///     .insert(B {});
+    ///
+    ///
+    /// # let mut schedule = Schedule::default();
+    /// # schedule.add_systems((system1));
+    /// # schedule.run(&mut world);
+    ///
+    /// ```
+    ///
     pub fn transmute_lens_immutable<NewD: QueryData>(&self) -> QueryLens<'_, NewD> {
         self.transmute_lens_filtered_immutable::<NewD, ()>()
     }
-    
-    
+
+
     /// Immutable version of [Self::transmute_lens_filtered]
     pub fn transmute_lens_filtered_immutable<NewD: QueryData, NewF: QueryFilter>(
         &self,
