@@ -1378,6 +1378,60 @@ impl<'w, 's, D: QueryData, F: QueryFilter> Query<'w, 's, D, F> {
         }
     }
 
+    /// Immutable version of [Self::transmute_lens]
+    ///
+    /// ```rust
+    /// # use bevy_ecs::prelude::*;
+    /// # use bevy_ecs::system::QueryLens;
+    /// #
+    /// # #[derive(Component)]
+    /// # struct A(usize);
+    /// #
+    /// # #[derive(Component)]
+    /// # struct B(usize);
+    /// #
+    /// # let mut world = World::new();
+    /// #
+    /// # world.spawn((A(10), B(5)));
+    /// #
+    ///
+    ///
+    /// fn reusable_function(q: &Query<&A>) {
+    ///     assert_eq!(q.single().0, 10);
+    /// }
+    ///
+    /// fn system1(query: Query<(&A, &B)>) {
+    ///     // immutable transmute lens is needed if you want to
+    ///     // transmute immutable queries:
+    ///     let mut lens = query.transmute_lens_immutable::<&A>();
+    ///     reusable_function(&lens.query());
+    /// }
+    ///
+    /// # let mut schedule = Schedule::default();
+    /// # schedule.add_systems((system1));
+    /// # schedule.run(&mut world);
+    /// ```
+    ///
+    pub fn transmute_lens_immutable<NewD: QueryData>(&self) -> QueryLens<'_, NewD> {
+        self.transmute_lens_filtered_immutable::<NewD, ()>()
+    }
+    
+    
+    /// Immutable version of [Self::transmute_lens_filtered]
+    pub fn transmute_lens_filtered_immutable<NewD: QueryData, NewF: QueryFilter>(
+        &self,
+    ) -> QueryLens<'_, NewD, NewF> {
+        let components = self.world.components();
+        let state = self.state.transmute_filtered::<NewD, NewF>(components);
+        QueryLens {
+            world: self.world,
+            state,
+            last_run: self.last_run,
+            this_run: self.this_run,
+        }
+    }
+    
+
     /// Gets a [`QueryLens`] with the same accesses as the existing query
     pub fn as_query_lens(&mut self) -> QueryLens<'_, D> {
         self.transmute_lens()
